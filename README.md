@@ -9,14 +9,6 @@ A lightweight Swift package for displaying syntax-highlighted code on iOS. Built
 - iOS 15+
 - Swift 5.9+
 
-## Installation
-
-Add the package via Swift Package Manager in Xcode, or in your `Package.swift`:
-
-```swift
-.package(url: "<your-repo-url>", from: "<version>")
-```
-
 Then add `"CodeEditorView"` to your target's dependencies.
 
 ## Usage
