@@ -54,7 +54,8 @@ class CoreTextCanvasView: UIView {
             if let text = highlightedCode, text.length > 0 {
                 // Create the framesetter once and cache it
                 cachedFramesetter = CTFramesetterCreateWithAttributedString(
-                    text as CFAttributedString)
+                    text as CFAttributedString
+                )
             }
 
             setNeedsDisplay()
@@ -84,8 +85,9 @@ class CoreTextCanvasView: UIView {
 
     private func setupGestures() {
         let longPress = UILongPressGestureRecognizer(
-            target: self, action: #selector(handleLongPress(_:)))
-        longPress.minimumPressDuration = 0.5  // Standard iOS long press duration
+            target: self,
+            action: #selector(handleLongPress(_:))
+        )
         addGestureRecognizer(longPress)
     }
 
@@ -108,7 +110,6 @@ class CoreTextCanvasView: UIView {
                 cursorIndex = currentIndex  // Move cursor as we drag
             }
         case .ended, .cancelled:
-            // Optional: Show copy menu here if selection is valid
             if let range = selectionRange, range.length > 0 {
                 // Show edit menu
             } else {

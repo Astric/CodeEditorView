@@ -36,8 +36,7 @@ public class CodeEditorView: UIScrollView {
     }
 
     private func setup() {
-        backgroundColor = .systemBackground
-        canvas.backgroundColor = .clear
+        canvas.backgroundColor = .tertiarySystemBackground
         canvas.delegate = self
         addSubview(canvas)
 
