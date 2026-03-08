@@ -1,15 +1,14 @@
+//
+//  SyntaxHighlighter.swift
+//  CodeEditorView
+//
+
 #if canImport(UIKit)
 import UIKit
 #endif
 #if canImport(AppKit)
 import AppKit
 #endif
-
-//
-//  SyntaxHighlighter.swift
-//  CodeEditorView
-//
-
 import SwiftTreeSitter
 
 

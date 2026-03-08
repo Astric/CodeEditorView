@@ -1,3 +1,8 @@
+//
+//  PlatformViewRepresentable.swift
+//  CodeEditorView
+//
+
 import SwiftUI
 
 #if os(macOS)

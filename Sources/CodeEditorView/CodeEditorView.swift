@@ -1,16 +1,14 @@
+//
+//  CodeEditorView.swift
+//  CodeEditorView
+//
+
 #if canImport(UIKit)
 import UIKit
 #endif
 #if canImport(AppKit)
 import AppKit
 #endif
-
-//
-//  CodeEditorView.swift
-//  CodeEditorView
-//
-
-
 
 #if os(macOS)
 class FlippedView: PlatformView {
@@ -70,14 +68,20 @@ public class CodeEditorView: PlatformScrollView {
 
     private func setup() {
         self.platformBackgroundColor = .platformSystemBackground
+        self.platformClipsToBounds = true
+        
         canvas.platformBackgroundColor = .clear
+        canvas.platformClipsToBounds = true
         canvas.delegate = self
+        
         gutterView.platformBackgroundColor = .platformSecondarySystemBackground
+        gutterView.platformClipsToBounds = true
 
         #if os(iOS)
         addSubview(canvas)
         addSubview(gutterView)
         delaysContentTouches = false
+        scrollIndicatorInsets = UIEdgeInsets(top: 0, left: GutterView.width, bottom: 0, right: 0)
         #elseif os(macOS)
         let container = FlippedView()
         container.addSubview(canvas)
@@ -88,6 +92,7 @@ public class CodeEditorView: PlatformScrollView {
         self.hasHorizontalScroller = true
         self.autohidesScrollers = true
         self.drawsBackground = false
+        self.scrollerInsets = NSEdgeInsets(top: 0, left: GutterView.width, bottom: 0, right: 0)
         
         setupScrollListener()
         #endif

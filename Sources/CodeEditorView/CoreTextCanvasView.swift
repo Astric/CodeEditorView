@@ -1,15 +1,14 @@
+//
+//  CoreTextCanvasView.swift
+//  CodeEditorView
+//
+
 #if canImport(UIKit)
 import UIKit
 #endif
 #if canImport(AppKit)
 import AppKit
 #endif
-
-//
-//  CoreTextCanvasView.swift
-//  CodeEditorView
-//
-
 import CoreText
 
 
@@ -243,7 +242,7 @@ class CoreTextCanvasView: PlatformView {
             return
         }
 
-        let drawingRect = bounds.insetBy(dx: 10, dy: 10)
+        let drawingRect = bounds
 
         if textFrame != nil && cachedFrameBounds == drawingRect { return }
 
@@ -387,11 +386,37 @@ class CoreTextCanvasView: PlatformView {
         handlePointerEvent(at: point)
     }
     #elseif os(macOS)
-    override func mouseUp(with event: NSEvent) {
-        super.mouseUp(with: event)
+    override func mouseDown(with event: NSEvent) {
         self.window?.makeFirstResponder(self)
         let point = convert(event.locationInWindow, from: nil)
-        handlePointerEvent(at: point)
+        if let index = characterIndex(at: point) {
+            selectionStart = index
+            cursorIndex = index
+            selectionRange = nil
+        }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        self.autoscroll(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        if let currentIndex = characterIndex(at: point), let start = selectionStart {
+            let location = min(start, currentIndex)
+            let length = abs(currentIndex - start)
+            if length > 0 {
+                selectionRange = NSRange(location: location, length: length)
+            } else {
+                selectionRange = nil
+            }
+            cursorIndex = currentIndex
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        super.mouseUp(with: event)
+        if selectionRange == nil || selectionRange?.length == 0 {
+            let point = convert(event.locationInWindow, from: nil)
+            handlePointerEvent(at: point)
+        }
     }
     #endif
 
@@ -522,9 +547,20 @@ extension CoreTextCanvasView: UIKeyInput {
         PlatformPasteboard.setString(String(text[range]))
     }
 
+    override func selectAll(_ sender: Any?) {
+        let length = highlightedCode?.length ?? 0
+        if length > 0 {
+            selectionRange = NSRange(location: 0, length: length)
+            cursorIndex = length
+        }
+    }
+
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
         if action == #selector(copy(_:)) {
             return selectionRange != nil && selectionRange!.length > 0
+        }
+        if action == #selector(selectAll(_:)) {
+            return highlightedCode?.length ?? 0 > 0
         }
         return super.canPerformAction(action, withSender: sender)
     }
@@ -541,6 +577,14 @@ extension CoreTextCanvasView {
             let range = Range(selectionRange, in: text)
         else { return }
         PlatformPasteboard.setString(String(text[range]))
+    }
+
+    @objc override func selectAll(_ sender: Any?) {
+        let length = highlightedCode?.length ?? 0
+        if length > 0 {
+            selectionRange = NSRange(location: 0, length: length)
+            cursorIndex = length
+        }
     }
 }
 #endif

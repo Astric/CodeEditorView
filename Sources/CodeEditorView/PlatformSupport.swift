@@ -1,15 +1,14 @@
+//
+//  PlatformSupport.swift
+//  CodeEditorView
+//
+
 #if canImport(UIKit)
 import UIKit
 #endif
 #if canImport(AppKit)
 import AppKit
 #endif
-
-//
-//  PlatformSupport.swift
-//  CodeEditorView
-//
-
 import SwiftUI
 #if os(iOS)
 
@@ -61,6 +60,24 @@ extension PlatformView {
             #elseif os(macOS)
             wantsLayer = true
             layer?.backgroundColor = newValue?.cgColor
+            #endif
+        }
+    }
+
+    var platformClipsToBounds: Bool {
+        get {
+            #if os(iOS)
+            return clipsToBounds
+            #elseif os(macOS)
+            return layer?.masksToBounds ?? false
+            #endif
+        }
+        set {
+            #if os(iOS)
+            clipsToBounds = newValue
+            #elseif os(macOS)
+            wantsLayer = true
+            layer?.masksToBounds = newValue
             #endif
         }
     }

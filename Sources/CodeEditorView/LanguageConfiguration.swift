@@ -1,15 +1,14 @@
+//
+//  LanguageConfiguration.swift
+//  CodeEditorView
+//
+
 #if canImport(UIKit)
 import UIKit
 #endif
 #if canImport(AppKit)
 import AppKit
 #endif
-
-//
-//  LanguageConfiguration.swift
-//  CodeEditorView
-//
-
 import Foundation
 import SwiftTreeSitter
 import TreeSitterJSON

@@ -1,16 +1,14 @@
+//
+//  GutterView.swift
+//  CodeEditorView
+//
+
 #if canImport(UIKit)
 import UIKit
 #endif
 #if canImport(AppKit)
 import AppKit
 #endif
-
-//
-//  GutterView.swift
-//  CodeEditorView
-//
-
-
 
 /// The view that displays the line numbers.
 /// It's a fixed view, it doesn't scroll alongside the scrollView.

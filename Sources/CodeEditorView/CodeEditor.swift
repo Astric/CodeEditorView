@@ -1,14 +1,14 @@
+//
+//  CodeEditor.swift
+//  CodeEditorView
+//
+
 #if canImport(UIKit)
 import UIKit
 #endif
 #if canImport(AppKit)
 import AppKit
 #endif
-
-//
-//  CodeEditor.swift
-//  CodeEditorView
-//
 
 import SwiftUI
 

@@ -1,16 +1,14 @@
+//
+//  SyntaxTheme.swift
+//  CodeEditorView
+//
+
 #if canImport(UIKit)
 import UIKit
 #endif
 #if canImport(AppKit)
 import AppKit
 #endif
-
-//
-//  SyntaxTheme.swift
-//  CodeEditorView
-//
-
-
 
 public struct SyntaxTheme {
     public let baseFont: PlatformFont
