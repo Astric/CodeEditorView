@@ -102,6 +102,18 @@ class CoreTextCanvasView: PlatformView {
             action: #selector(handleLongPress(_:))
         )
         addGestureRecognizer(longPress)
+
+        let doubleTap = UITapGestureRecognizer(
+            target: self,
+            action: #selector(handleDoubleTap(_:))
+        )
+        doubleTap.numberOfTapsRequired = 2
+        addGestureRecognizer(doubleTap)
+    }
+
+    @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+        let point = gesture.location(in: self)
+        handleDoubleClick(at: point)
     }
 
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
@@ -389,7 +401,9 @@ class CoreTextCanvasView: PlatformView {
     override func mouseDown(with event: NSEvent) {
         self.window?.makeFirstResponder(self)
         let point = convert(event.locationInWindow, from: nil)
-        if let index = characterIndex(at: point) {
+        if event.clickCount == 2 {
+            handleDoubleClick(at: point)
+        } else if let index = characterIndex(at: point) {
             selectionStart = index
             cursorIndex = index
             selectionRange = nil
@@ -425,6 +439,36 @@ class CoreTextCanvasView: PlatformView {
             cursorIndex = index
             selectionRange = nil
         }
+    }
+
+    private func handleDoubleClick(at point: CGPoint) {
+        guard let index = characterIndex(at: point) else { return }
+        selectionRange = wordRange(at: index)
+        cursorIndex = selectionRange.map { $0.location + $0.length }
+    }
+
+    private func wordRange(at index: Int) -> NSRange? {
+        guard let text = highlightedCode?.string as NSString?, text.length > 0 else { return nil }
+        let safeIndex = min(index, text.length - 1)
+        let cls = charClass(text.character(at: safeIndex))
+
+        var start = safeIndex
+        var end = safeIndex
+
+        while start > 0 && charClass(text.character(at: start - 1)) == cls { start -= 1 }
+        while end < text.length - 1 && charClass(text.character(at: end + 1)) == cls { end += 1 }
+
+        return NSRange(location: start, length: end - start + 1)
+    }
+
+    private enum CharClass { case word, space, other }
+
+    private func charClass(_ c: unichar) -> CharClass {
+        if (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 48 && c <= 57) || c == 95 {
+            return .word  // A-Z, a-z, 0-9, _
+        }
+        if c == 32 || c == 9 { return .space }  // space, tab
+        return .other
     }
 
     /// Positions the cursor layer using CoreText line geometry — no redraw needed
@@ -481,6 +525,91 @@ class CoreTextCanvasView: PlatformView {
         }
     }
 
+    // MARK: - Keyboard Navigation
+
+    private func visualLineIndex(for charIndex: Int, in lines: [CTLine]) -> Int? {
+        for i in 0..<lines.count {
+            let range = CTLineGetStringRange(lines[i])
+            let end = range.location + range.length
+            let isLastLine = i == lines.count - 1
+            if charIndex >= range.location && (charIndex < end || (isLastLine && charIndex == end)) {
+                return i
+            }
+        }
+        return nil
+    }
+
+    private func moveCursorLeft() {
+        guard let idx = cursorIndex, idx > 0, let text = highlightedCode else { return }
+        var newIdx = idx - 1
+        // Skip over the newline so the cursor jumps directly to the end of the previous line
+        if newIdx > 0 && (text.string as NSString).character(at: newIdx) == 10 {
+            newIdx -= 1
+        }
+        cursorIndex = newIdx
+        selectionRange = nil
+        scrollCursorToVisible()
+    }
+
+    private func moveCursorRight() {
+        guard let idx = cursorIndex, let text = highlightedCode, idx < text.length else { return }
+        var newIdx = idx + 1
+        // Skip over the newline so the cursor jumps directly to the start of the next line
+        if newIdx < text.length && (text.string as NSString).character(at: newIdx) == 10 {
+            newIdx += 1
+        }
+        cursorIndex = min(text.length, newIdx)
+        selectionRange = nil
+        scrollCursorToVisible()
+    }
+
+    private func moveCursorUp() {
+        guard let idx = cursorIndex, let frame = textFrame else { return }
+        let lines = CTFrameGetLines(frame) as! [CTLine]
+        guard let lineIdx = visualLineIndex(for: idx, in: lines), lineIdx > 0 else { return }
+
+        let xOffset = CTLineGetOffsetForStringIndex(lines[lineIdx], idx, nil)
+        cursorIndex = clampedIndex(
+            CTLineGetStringIndexForPosition(lines[lineIdx - 1], CGPoint(x: xOffset, y: 0)),
+            to: lineIdx - 1, in: lines)
+        selectionRange = nil
+        scrollCursorToVisible()
+    }
+
+    private func moveCursorDown() {
+        guard let idx = cursorIndex, let frame = textFrame else { return }
+        let lines = CTFrameGetLines(frame) as! [CTLine]
+        guard let lineIdx = visualLineIndex(for: idx, in: lines), lineIdx < lines.count - 1 else { return }
+
+        let xOffset = CTLineGetOffsetForStringIndex(lines[lineIdx], idx, nil)
+        cursorIndex = clampedIndex(
+            CTLineGetStringIndexForPosition(lines[lineIdx + 1], CGPoint(x: xOffset, y: 0)),
+            to: lineIdx + 1, in: lines)
+        selectionRange = nil
+        scrollCursorToVisible()
+    }
+
+    /// Clamps a character index so it stays within the given line's range,
+    /// excluding the trailing newline (if any) so the cursor never escapes to the next line.
+    private func clampedIndex(_ index: Int, to lineIdx: Int, in lines: [CTLine]) -> Int {
+        let range = CTLineGetStringRange(lines[lineIdx])
+        let isLastLine = lineIdx == lines.count - 1
+        // For all but the last line, cap at location + length - 1 to stay on the newline char,
+        // which keeps the cursor visually on this line.
+        let maxIndex = isLastLine ? range.location + range.length : range.location + max(0, range.length - 1)
+        return min(index, maxIndex)
+    }
+
+    private func scrollCursorToVisible() {
+        guard !cursorLayer.isHidden else { return }
+        let rect = cursorLayer.frame.insetBy(dx: -8, dy: -8)
+        #if os(iOS)
+        scrollRectToVisible(rect, animated: false)
+        #elseif os(macOS)
+        scrollToVisible(rect)
+        #endif
+    }
+
     func characterIndex(at point: CGPoint) -> Int? {
         guard let frame = textFrame else { return nil }
 
@@ -531,6 +660,19 @@ extension CoreTextCanvasView: UIKeyInput {
         return highlightedCode?.length ?? 0 > 0
     }
 
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        for press in presses {
+            guard let key = press.key else { continue }
+            switch key.keyCode {
+            case .keyboardLeftArrow:  moveCursorLeft()
+            case .keyboardRightArrow: moveCursorRight()
+            case .keyboardUpArrow:    moveCursorUp()
+            case .keyboardDownArrow:  moveCursorDown()
+            default: super.pressesBegan([press], with: event)
+            }
+        }
+    }
+
     func insertText(_ text: String) {
         print("Keyboard sent character: \(text)")
     }
@@ -569,6 +711,16 @@ extension CoreTextCanvasView: UIKeyInput {
 extension CoreTextCanvasView {
     override var acceptsFirstResponder: Bool {
         return true
+    }
+
+    override func keyDown(with event: NSEvent) {
+        switch event.keyCode {
+        case 123: moveCursorLeft()   // Left arrow
+        case 124: moveCursorRight()  // Right arrow
+        case 125: moveCursorDown()   // Down arrow
+        case 126: moveCursorUp()     // Up arrow
+        default:  super.keyDown(with: event)
+        }
     }
     
     @objc func copy(_ sender: Any?) {
