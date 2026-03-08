@@ -1,10 +1,17 @@
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
+
 //
 //  CoreTextCanvasView.swift
 //  CodeEditorView
 //
 
 import CoreText
-import UIKit
+
 
 protocol CoreTextCanvasViewDelegate: AnyObject {
     func canvasView(
@@ -17,7 +24,11 @@ class CustomCATiledLayer: CATiledLayer {
     override class func fadeDuration() -> CFTimeInterval { 0 }
 }
 
-class CoreTextCanvasView: UIView {
+class CoreTextCanvasView: PlatformView {
+
+    #if os(macOS)
+    override var isFlipped: Bool { true }
+    #endif
 
     weak var delegate: CoreTextCanvasViewDelegate?
 
@@ -42,7 +53,7 @@ class CoreTextCanvasView: UIView {
 
     private var selectionStart: Int?
 
-    var selectionColor: UIColor = UIColor.systemBlue.withAlphaComponent(0.3)
+    var selectionColor: PlatformColor = PlatformColor.systemBlue.withAlphaComponent(0.3)
 
     var highlightedCode: NSAttributedString? {
         didSet {
@@ -74,7 +85,9 @@ class CoreTextCanvasView: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
+        #if os(iOS)
         isUserInteractionEnabled = true
+        #endif
 
         if let tiledLayer = self.layer as? CustomCATiledLayer {
             tiledLayer.tileSize = CGSize(width: 1024, height: 1024)
@@ -83,6 +96,7 @@ class CoreTextCanvasView: UIView {
         setupGestures()
     }
 
+    #if os(iOS)
     private func setupGestures() {
         let longPress = UILongPressGestureRecognizer(
             target: self,
@@ -119,12 +133,21 @@ class CoreTextCanvasView: UIView {
             break
         }
     }
+    #else
+    private func setupGestures() {}
+    #endif
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
+    #if os(iOS)
     override func sizeThatFits(_ size: CGSize) -> CGSize {
+        return platformSizeThatFits(size)
+    }
+    #endif
+
+    func platformSizeThatFits(_ size: CGSize) -> CGSize {
         // Return cached size if available
         if let cachedSize = cachedSize { return cachedSize }
 
@@ -150,8 +173,19 @@ class CoreTextCanvasView: UIView {
         return result
     }
 
+    #if os(iOS)
     override func layoutSubviews() {
         super.layoutSubviews()
+        updateLayout()
+    }
+    #elseif os(macOS)
+    override func layout() {
+        super.layout()
+        updateLayout()
+    }
+    #endif
+
+    private func updateLayout() {
         ensureTextFrame()
         delegate?.canvasView(self, didLayoutLines: computeAllLinePositions())
     }
@@ -218,28 +252,45 @@ class CoreTextCanvasView: UIView {
         cachedFrameBounds = drawingRect
     }
 
+    #if os(iOS)
     override func draw(_ rect: CGRect) {
         super.draw(rect)
+        performDraw(rect)
+    }
+    #elseif os(macOS)
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        performDraw(dirtyRect)
+    }
+    #endif
 
-        guard let context = UIGraphicsGetCurrentContext(),
+    private func performDraw(_ rect: CGRect) {
+        guard let context = PlatformGraphicsContext.current,
             highlightedCode != nil
         else { return }
-
-        // Flip the coordinate system
-        context.textMatrix = .identity
-        context.translateBy(x: 0, y: bounds.height)
-        context.scaleBy(x: 1.0, y: -1.0)
 
         // Reuse the cached frame
         ensureTextFrame()
         guard let frame = textFrame else { return }
 
+        context.saveGState()
+
+        #if os(iOS)
+        // Flip the coordinate system for CoreText on iOS
+        context.textMatrix = .identity
+        context.translateBy(x: 0, y: bounds.height)
+        context.scaleBy(x: 1.0, y: -1.0)
         let flippedRect = CGRect(
             x: rect.origin.x,
             y: bounds.height - rect.origin.y - rect.height,
             width: rect.width,
             height: rect.height
         )
+        #elseif os(macOS)
+        // In a flipped NSView, Y goes down. CoreText draws text upright if textMatrix Y scale is -1.
+        context.textMatrix = CGAffineTransform(scaleX: 1.0, y: -1.0)
+        let flippedRect = rect // No flip needed for bounds checking since we draw in top-left
+        #endif
 
         let lines = CTFrameGetLines(frame) as! [CTLine]
         var origins = [CGPoint](repeating: .zero, count: lines.count)
@@ -247,7 +298,6 @@ class CoreTextCanvasView: UIView {
 
         // selection background
         if let selectionRange = selectionRange, selectionRange.length > 0 {
-            context.saveGState()
             selectionColor.setFill()
 
             for i in 0..<lines.count {
@@ -267,9 +317,16 @@ class CoreTextCanvasView: UIView {
                     CTLineGetTypographicBounds(line, &ascent, &descent, &leading)
 
                     let origin = origins[i]
+                    
+                    #if os(iOS)
                     let selectionRect = CGRect(
                         x: origin.x + xStart, y: origin.y - descent, width: xEnd - xStart,
                         height: ascent + descent)
+                    #elseif os(macOS)
+                    let selectionRect = CGRect(
+                        x: origin.x + xStart, y: bounds.height - (origin.y + ascent), width: xEnd - xStart,
+                        height: ascent + descent)
+                    #endif
 
                     // Only draw if it's within the current tile's rect
                     if selectionRect.intersects(flippedRect) {
@@ -277,7 +334,6 @@ class CoreTextCanvasView: UIView {
                     }
                 }
             }
-            context.restoreGState()
         }
 
         for i in 0..<lines.count {
@@ -289,31 +345,57 @@ class CoreTextCanvasView: UIView {
             var leading: CGFloat = 0
             CTLineGetTypographicBounds(line, &ascent, &descent, &leading)
 
+            #if os(iOS)
             let lineTop = origin.y + ascent
             let lineBottom = origin.y - descent - leading
             if lineTop < flippedRect.minY || lineBottom > flippedRect.maxY { continue }
-
-            // Draw this line at its origin
             context.textPosition = origin
+            #elseif os(macOS)
+            let uiKitY = bounds.height - (origin.y + ascent)
+            let lineTop = uiKitY
+            let lineBottom = uiKitY + ascent + descent + leading
+            if lineBottom < flippedRect.minY || lineTop > flippedRect.maxY { continue }
+            context.textPosition = CGPoint(x: origin.x, y: bounds.height - origin.y)
+            #endif
+
             CTLineDraw(line, context)
         }
+        
+        context.restoreGState()
     }
 
     private lazy var cursorLayer: CALayer = {
         let layer = CALayer()
-        layer.backgroundColor = UIColor.systemBlue.cgColor
+        layer.backgroundColor = PlatformColor.platformBlue.cgColor
         layer.isHidden = true
+        #if os(iOS)
         self.layer.addSublayer(layer)
+        #elseif os(macOS)
+        self.wantsLayer = true
+        self.layer?.addSublayer(layer)
+        #endif
         return layer
     }()
 
+    #if os(iOS)
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesEnded(touches, with: event)
         self.becomeFirstResponder()
 
         guard let touch = touches.first else { return }
         let point = touch.location(in: self)
+        handlePointerEvent(at: point)
+    }
+    #elseif os(macOS)
+    override func mouseUp(with event: NSEvent) {
+        super.mouseUp(with: event)
+        self.window?.makeFirstResponder(self)
+        let point = convert(event.locationInWindow, from: nil)
+        handlePointerEvent(at: point)
+    }
+    #endif
 
+    private func handlePointerEvent(at point: CGPoint) {
         if let index = characterIndex(at: point) {
             cursorIndex = index
             selectionRange = nil
@@ -411,6 +493,7 @@ class CoreTextCanvasView: UIView {
     }
 }
 
+#if os(iOS)
 extension CoreTextCanvasView: UIKeyInput {
     override class var layerClass: AnyClass {
         return CustomCATiledLayer.self
@@ -436,7 +519,7 @@ extension CoreTextCanvasView: UIKeyInput {
             let text = highlightedCode?.string,
             let range = Range(selectionRange, in: text)
         else { return }
-        UIPasteboard.general.string = String(text[range])
+        PlatformPasteboard.setString(String(text[range]))
     }
 
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
@@ -446,3 +529,18 @@ extension CoreTextCanvasView: UIKeyInput {
         return super.canPerformAction(action, withSender: sender)
     }
 }
+#elseif os(macOS)
+extension CoreTextCanvasView {
+    override var acceptsFirstResponder: Bool {
+        return true
+    }
+    
+    @objc func copy(_ sender: Any?) {
+        guard let selectionRange = selectionRange,
+            let text = highlightedCode?.string,
+            let range = Range(selectionRange, in: text)
+        else { return }
+        PlatformPasteboard.setString(String(text[range]))
+    }
+}
+#endif

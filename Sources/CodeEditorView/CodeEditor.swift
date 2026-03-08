@@ -1,16 +1,23 @@
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
+
 //
 //  CodeEditor.swift
 //  CodeEditorView
 //
 
 import SwiftUI
-import UIKit
 
-public struct CodeEditor: UIViewRepresentable {
+
+public struct CodeEditor: PlatformViewRepresentable {
     private let code: String
     private let language: LanguageConfiguration?
     private var isWordWrapEnabled: Bool = false
-    private var customBackgroundColor: UIColor = .systemBackground
+    private var customBackgroundColor: PlatformColor = .platformSystemBackground
     private var customTheme: SyntaxTheme = .default
 
     public init(code: String, language: LanguageConfiguration? = nil) {
@@ -24,13 +31,13 @@ public struct CodeEditor: UIViewRepresentable {
         return copy
     }
 
-    public func backgroundColor(_ color: UIColor) -> Self {
+    public func backgroundColor(_ color: PlatformColor) -> Self {
         var copy = self
         copy.customBackgroundColor = color
         return copy
     }
 
-    public func font(_ font: UIFont) -> Self {
+    public func font(_ font: PlatformFont) -> Self {
         var copy = self
         copy.customTheme = SyntaxTheme(
             baseFont: font,
@@ -46,18 +53,18 @@ public struct CodeEditor: UIViewRepresentable {
         return copy
     }
 
-    public func makeUIView(context: Context) -> CodeEditorView {
+    public func makePlatformView(context: Context) -> CodeEditorView {
         let view = CodeEditorView()
         updateView(view)
         return view
     }
 
-    public func updateUIView(_ uiView: CodeEditorView, context: Context) {
+    public func updatePlatformView(_ uiView: CodeEditorView, context: Context) {
         updateView(uiView)
     }
 
     private func updateView(_ view: CodeEditorView) {
-        view.backgroundColor = customBackgroundColor
+        view.platformBackgroundColor = customBackgroundColor
         view.wordWrap = isWordWrapEnabled
 
         if let language = language {

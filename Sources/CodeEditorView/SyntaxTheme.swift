@@ -1,19 +1,26 @@
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
+
 //
 //  SyntaxTheme.swift
 //  CodeEditorView
 //
 
-import UIKit
+
 
 public struct SyntaxTheme {
-    public let baseFont: UIFont
-    public let baseColor: UIColor
-    public let captureColors: [String: UIColor]
+    public let baseFont: PlatformFont
+    public let baseColor: PlatformColor
+    public let captureColors: [String: PlatformColor]
 
     public init(
-        baseFont: UIFont = .monospacedSystemFont(ofSize: 16, weight: .medium),
-        baseColor: UIColor = .label,
-        captureColors: [String: UIColor] = [:]
+        baseFont: PlatformFont = .monospacedSystemFont(ofSize: 16, weight: .medium),
+        baseColor: PlatformColor = .platformLabel,
+        captureColors: [String: PlatformColor] = [:]
     ) {
         self.baseFont = baseFont
         self.baseColor = baseColor
@@ -25,15 +32,15 @@ extension SyntaxTheme {
     public static var `default`: SyntaxTheme {
         return SyntaxTheme(
             baseFont: .monospacedSystemFont(ofSize: 16, weight: .medium),
-            baseColor: .label,
+            baseColor: .platformLabel,
             captureColors: [
                 "keyword": .systemPink,
                 "function": .systemCyan,
                 "function.builtin": .systemCyan,
                 "type": .systemMint,
-                "variable": .label,
+                "variable": .platformLabel,
                 "property": .systemTeal,
-                "operator": .label,
+                "operator": .platformLabel,
                 "tag": .systemRed,
                 "attribute": .systemIndigo,
                 "string.special.key": .systemCyan,

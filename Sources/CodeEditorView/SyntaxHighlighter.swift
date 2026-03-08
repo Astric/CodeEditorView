@@ -1,10 +1,17 @@
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
+
 //
 //  SyntaxHighlighter.swift
 //  CodeEditorView
 //
 
 import SwiftTreeSitter
-import UIKit
+
 
 public final class SyntaxHighlighter {
     static let spacesPerTab = 4
@@ -90,7 +97,7 @@ public final class SyntaxHighlighter {
         return attributed
     }
 
-    private func colorForCapture(_ name: String) -> UIColor? {
+    private func colorForCapture(_ name: String) -> PlatformColor? {
         if let color = theme.captureColors[name] {
             return color
         }
